@@ -1,0 +1,1003 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pastoral Dashboard - SLT Edition</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <style>
+        /* GREEN & GOLD THEME */
+        :root { --brand: #064e3b; --gold: #d97706; }
+        body { background-color: #f0fdf4; font-family: 'Segoe UI', sans-serif; }
+        
+        /* Scrollbar */
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: #f1f1f1; }
+        ::-webkit-scrollbar-thumb { background: #064e3b; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #042f2e; }
+
+        /* Badges & Tags */
+        .tag { font-size: 0.7rem; font-weight: 700; padding: 2px 8px; border-radius: 99px; text-transform: uppercase; letter-spacing: 0.05em; display: inline-block; }
+        .tag-sen { background: #dcfce7; color: #166534; border: 1px solid #86efac; }
+        .tag-pp { background: #fff7ed; color: #9a3412; border: 1px solid #fdba74; }
+        .tag-hpa { background: #e0f2fe; color: #075985; border: 1px solid #7dd3fc; }
+        .tag-lpa { background: #fef2f2; color: #991b1b; border: 1px solid #fecaca; }
+
+        /* Diagnostic Colors */
+        .diag-org { background: #fff7ed; color: #c2410c; border-left: 4px solid #f97316; } 
+        .diag-dis { background: #fefce8; color: #a16207; border-left: 4px solid #eab308; } 
+        .diag-def { background: #fef2f2; color: #b91c1c; border-left: 4px solid #ef4444; } 
+        .diag-saf { background: #450a0a; color: #fecaca; border-left: 4px solid #991b1b; } 
+        .diag-gen { background: #f0f9ff; color: #0369a1; border-left: 4px solid #0ea5e9; } 
+
+        /* Strategy Cards */
+        .strat-card { background: white; border-radius: 6px; padding: 10px; border: 1px solid #e2e8f0; box-shadow: 0 1px 2px rgba(0,0,0,0.05); font-size: 0.85rem; color: #334155; display: flex; align-items: start; gap: 8px; }
+        .strat-icon { margin-top: 2px; flex-shrink: 0; }
+
+        /* Heatmap Cells */
+        .hm-cell { transition: all 0.2s; cursor: pointer; }
+        .hm-cell:hover { transform: scale(1.05); border: 1px solid #78350f; z-index: 10; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); }
+        
+        /* Modal & Layout */
+        .modal-backdrop { background-color: rgba(6, 78, 59, 0.6); backdrop-filter: blur(4px); }
+        tr.cursor-pointer:hover td { background-color: #ecfdf5; color: #064e3b; } 
+        
+        /* Animations */
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .animate-fade-in { animation: fadeIn 0.5s ease-out forwards; }
+    </style>
+</head>
+<body>
+
+    <!-- NAVIGATION -->
+    <nav class="bg-emerald-900 text-white p-4 sticky top-0 z-50 shadow-lg border-b-4 border-yellow-500">
+        <div class="max-w-7xl mx-auto flex justify-between items-center">
+            <div>
+                <h1 class="text-xl font-bold tracking-tight text-white flex items-center gap-2">
+                    <svg class="w-6 h-6 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
+                    Pastoral Impact Dashboard
+                </h1>
+                <p class="text-xs text-yellow-400 font-bold tracking-wide ml-8">Diagnostic Profiling & Strategy Engine</p>
+            </div>
+            <div class="flex gap-3">
+                <button onclick="loadDemoData()" class="bg-emerald-800 hover:bg-emerald-700 px-4 py-2 rounded text-xs font-bold uppercase transition border border-emerald-600 text-yellow-50 shadow-sm">
+                    Load Demo Data
+                </button>
+                <label class="bg-yellow-600 hover:bg-yellow-500 px-4 py-2 rounded text-xs font-bold uppercase cursor-pointer transition shadow-lg text-white flex items-center gap-2 border border-yellow-700">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
+                    Upload CSV
+                    <input type="file" id="file-input" accept=".csv" class="hidden">
+                </label>
+            </div>
+        </div>
+    </nav>
+
+    <!-- MAIN CONTENT -->
+    <main class="max-w-7xl mx-auto p-6 space-y-8 pb-24">
+
+        <!-- STATUS BAR -->
+        <div class="bg-white p-4 rounded-xl shadow-sm border border-emerald-100 flex justify-between items-center">
+            <div>
+                <h2 class="font-bold text-emerald-900">System Status</h2>
+                <p class="text-sm text-slate-500 flex items-center gap-2" id="status-msg">
+                    <span class="w-2 h-2 rounded-full bg-slate-300"></span> Waiting for data...
+                </p>
+            </div>
+            <div class="text-right">
+                <div class="text-3xl font-black text-emerald-900 tracking-tight" id="total-incidents">0</div>
+                <div class="text-xs text-emerald-600 uppercase font-bold tracking-wider">Incidents Processed</div>
+            </div>
+        </div>
+
+        <!-- YEAR GROUP MATRICES -->
+        <section>
+            <h2 class="text-lg font-bold text-emerald-900 mb-4 flex items-center gap-2">
+                <span class="bg-yellow-500 w-1.5 h-6 rounded-full"></span>
+                Year Group Analysis (Top 5 Concerns)
+            </h2>
+            <div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4" id="year-matrices">
+                <div class="col-span-full text-center py-12 text-slate-400 bg-white border-2 border-dashed border-slate-300 rounded-xl">
+                    <p>Upload a CSV file (Columns: Name, Year, Date, Type, Subject) or click "Load Demo Data".</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- HEATMAP & ON CALL -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            
+            <!-- HEATMAP -->
+            <section id="heatmap-section" class="lg:col-span-1 hidden animate-fade-in">
+                <div class="flex justify-between items-end mb-4">
+                    <div>
+                        <h2 class="text-lg font-bold text-emerald-900 flex items-center gap-2">
+                            <span class="bg-red-500 w-1.5 h-6 rounded-full"></span>
+                            Weekly Intensity
+                        </h2>
+                        <p class="text-[10px] text-slate-400 mt-1">By Period (Click cells for class details)</p>
+                    </div>
+                    <span class="text-xs font-bold text-slate-500 bg-white px-2 py-1 rounded border" id="heatmap-date-range">Current Week</span>
+                </div>
+                
+                <div class="bg-white rounded-xl shadow-sm border border-emerald-100 p-4 overflow-x-auto">
+                    <div class="min-w-full">
+                        <div class="grid grid-cols-6 gap-2 mb-2 text-center text-[10px] font-bold text-slate-500 uppercase">
+                            <div class="text-left pl-2">Period</div>
+                            <div>M</div><div>T</div><div>W</div><div>T</div><div>F</div>
+                        </div>
+                        <div id="heatmap-grid" class="space-y-2"></div>
+                    </div>
+                    <div class="mt-4 flex justify-end items-center gap-2 text-[10px] text-slate-400">
+                        <span>Low</span>
+                        <div class="flex gap-1">
+                            <span class="w-3 h-3 bg-red-50 rounded"></span>
+                            <span class="w-3 h-3 bg-red-200 rounded"></span>
+                            <span class="w-3 h-3 bg-red-400 rounded"></span>
+                            <span class="w-3 h-3 bg-red-600 rounded"></span>
+                            <span class="w-3 h-3 bg-red-900 rounded"></span>
+                        </div>
+                        <span>High</span>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ON CALL STATS -->
+            <section id="on-call-analysis" class="lg:col-span-2 hidden animate-fade-in">
+                <h2 class="text-lg font-bold text-emerald-900 mb-4 flex items-center gap-2">
+                    <span class="bg-purple-600 w-1.5 h-6 rounded-full"></span>
+                    Removal & On Call Hotspots
+                </h2>
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    
+                    <div class="bg-white rounded-xl shadow-sm border border-emerald-100 p-4">
+                        <h3 class="text-xs font-bold text-emerald-700 uppercase tracking-wider mb-3 border-b border-emerald-50 pb-1">Repeat Students</h3>
+                        <div id="oc-students" class="space-y-2"></div>
+                    </div>
+
+                    <div class="bg-white rounded-xl shadow-sm border border-emerald-100 p-4">
+                        <h3 class="text-xs font-bold text-emerald-700 uppercase tracking-wider mb-3 border-b border-emerald-50 pb-1">Subject Areas</h3>
+                        <div id="oc-subjects" class="space-y-2"></div>
+                    </div>
+
+                    <div class="bg-white rounded-xl shadow-sm border border-emerald-100 p-4">
+                        <h3 class="text-xs font-bold text-emerald-700 uppercase tracking-wider mb-3 border-b border-emerald-50 pb-1">Staff / Groups</h3>
+                        <div id="oc-teachers" class="space-y-2"></div>
+                    </div>
+
+                </div>
+            </section>
+        </div>
+
+        <!-- STUDENT DEEP DIVE PROFILE -->
+        <section id="student-focus" class="hidden animate-fade-in">
+            <div class="bg-white rounded-xl shadow-xl border border-emerald-100 overflow-hidden">
+                
+                <!-- Profile Header -->
+                <div class="bg-emerald-800 text-white p-6 md:p-8 flex flex-col md:flex-row justify-between items-start md:items-center border-b-4 border-yellow-500 gap-4">
+                    <div>
+                        <div class="flex items-center gap-3 mb-2">
+                            <h2 class="text-3xl font-bold" id="focus-name">Student Name</h2>
+                            <span class="bg-emerald-900 text-yellow-400 text-xs px-2 py-1 rounded font-mono border border-emerald-600" id="focus-reg">FORM</span>
+                        </div>
+                        <div class="flex flex-wrap gap-2" id="focus-badges"></div>
+                    </div>
+                    <div class="flex items-center gap-6">
+                        <div class="text-right hidden md:block">
+                            <div class="text-4xl font-bold text-white tracking-tighter" id="focus-count">0</div>
+                            <div class="text-[10px] text-emerald-200 font-bold uppercase tracking-widest mt-1">Total Events</div>
+                        </div>
+                        <button onclick="closeProfile()" class="text-emerald-300 hover:text-white">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 lg:grid-cols-12 gap-0">
+                    
+                    <!-- Left Column: Data Profile -->
+                    <div class="lg:col-span-4 p-6 border-r border-slate-200 bg-slate-50">
+                        <h3 class="font-bold text-emerald-900 mb-4 border-b border-slate-200 pb-2 uppercase text-xs tracking-wider">Data Profile</h3>
+                        
+                        <div class="space-y-4 text-sm mb-8">
+                            <div class="flex justify-between items-center bg-white p-3 rounded border border-slate-200 shadow-sm">
+                                <span class="text-slate-500 font-medium text-xs uppercase">Primary Pattern</span>
+                                <span class="font-bold px-2 py-1 rounded text-xs uppercase" id="focus-diagnosis">--</span>
+                            </div>
+
+                            <div class="flex justify-between items-center bg-white p-3 rounded border border-slate-200 shadow-sm">
+                                <span class="text-slate-500 font-medium text-xs uppercase">Concern Subject</span>
+                                <span class="font-bold text-red-600 text-right" id="focus-dept">--</span>
+                            </div>
+
+                            <div class="grid grid-cols-2 gap-3">
+                                <div class="bg-white p-3 rounded border border-slate-200">
+                                    <div class="text-slate-400 text-[10px] uppercase font-bold mb-1">Reading Age</div>
+                                    <div class="font-bold text-lg text-slate-800" id="focus-ra">--</div>
+                                </div>
+                                <div class="bg-white p-3 rounded border border-slate-200">
+                                    <div class="text-slate-400 text-[10px] uppercase font-bold mb-1">Attainment</div>
+                                    <div class="font-bold text-lg text-slate-800" id="focus-pa">--</div>
+                                </div>
+                            </div>
+
+                            <div class="space-y-2 text-xs">
+                                <div class="flex justify-between border-b border-slate-200 pb-1">
+                                    <span class="text-slate-500">SEN Status</span>
+                                    <span class="font-bold text-slate-800 text-right w-1/2 truncate" id="focus-sen-detail">--</span>
+                                </div>
+                                <div class="flex justify-between border-b border-slate-200 pb-1">
+                                    <span class="text-slate-500">Pupil Premium</span>
+                                    <span class="font-bold text-slate-800" id="focus-pp-detail">--</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="h-40 relative">
+                            <canvas id="student-chart"></canvas>
+                        </div>
+                    </div>
+
+                    <!-- Right Column: Strategy Engine -->
+                    <div class="lg:col-span-8 p-6 md:p-8 bg-white">
+                        <h3 class="font-bold text-emerald-900 mb-6 flex items-center gap-2 uppercase text-xs tracking-wider">
+                            <svg class="w-5 h-5 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                            Tailored Strategy Engine
+                        </h3>
+
+                        <div class="mb-6 bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                            <h4 class="text-xs font-bold text-yellow-700 uppercase mb-2">Key Themes from Comments</h4>
+                            <p class="text-sm text-yellow-900 italic leading-relaxed" id="comment-analysis">No comments available for analysis.</p>
+                        </div>
+                        
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div>
+                                <h4 class="text-xs font-bold text-emerald-700 uppercase mb-3 border-b border-emerald-100 pb-1">Classroom Management</h4>
+                                <div id="strat-classroom" class="space-y-2"></div>
+                            </div>
+                            <div>
+                                <h4 class="text-xs font-bold text-blue-700 uppercase mb-3 border-b border-blue-100 pb-1" id="sen-header">SEN & Literacy Support</h4>
+                                <div id="strat-special" class="space-y-2"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- MODAL -->
+    <div id="detail-modal" class="fixed inset-0 z-50 hidden modal-backdrop flex justify-center items-center p-4">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-6xl max-h-[90vh] overflow-hidden flex flex-col">
+            <div class="bg-emerald-900 text-white p-5 flex justify-between items-center border-b-4 border-yellow-500">
+                <div>
+                    <h2 class="text-xl font-bold" id="modal-title">Analysis</h2>
+                    <p class="text-xs text-emerald-300 mt-1" id="modal-subtitle">--</p>
+                </div>
+                <button onclick="closeModal()" class="text-emerald-300 hover:text-white transition">
+                    <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+            </div>
+            
+            <div class="p-6 overflow-y-auto bg-slate-50 flex-1 space-y-8">
+                
+                <!-- Dynamic Modal Content -->
+                <div id="modal-content-container">
+                    <!-- Content injected by JS -->
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ================= STATE & CONFIG =================
+        let studentData = {};
+        let onCallStats = { groups:{}, students:{}, subjects:{}, teachers:{} };
+        let heatmapData = {}; 
+        let heatmapDrilldown = {}; // New: Stores class data for Period x Day
+        let chartInstance = null;
+        
+        // Global dates for filtering
+        let recentActiveDates = [];
+
+        // Linked SEN Provision Database (Extracted from SEN Passport/Provision Map)
+        const SEN_PROVISIONS_DB = {
+            "Abdus Samad Sarwar": [
+                "KS3 Lunch Club (Communication & Interaction)",
+                "1:1 PSP Sessions (Cognition & Learning)",
+                "Social Stories (Personalised)",
+                "In-class support (Cognition & Learning)",
+                "Bridge Outreach Support (ASC)"
+            ],
+            "Adam Ammar Khodja": [
+                "Pupil Support Plan (Stage K)",
+                "Visual aids for instructions (EAL Support)",
+                "Scaffolded writing frames",
+                "Check Medical Needs (None recorded)",
+                "Monitor Attendance (Target: 100%)"
+            ]
+        };
+
+        const DIAGNOSIS_MAP = {
+            organisation: ['late', 'equipment', 'homework', 'uniform', 'planner', 'coat', 'jewellery', 'pe kit'],
+            disruption:   ['chat', 'talk', 'noise', 'disrupt', 'shout', 'call out', 'task', 'distract', 'eating', 'mobile', 'poor attitude'],
+            defiance:     ['defian', 'refus', 'rude', 'arguing', 'instruction', 'walk away', 'attitude', 'fail'],
+            safety:       ['fight', 'phys', 'aggress', 'violent', 'danger', 'safe', 'on call', 'truan', 'abscond', 'bully']
+        };
+        
+        // Strategies
+        const STRATEGIES = {
+            "Safety & Regulation": [
+                "Immediate removal to safe space if escalated.",
+                "Implement a 'Cool-off' card system.",
+                "Risk assessment required for practical lessons.",
+                "Seating plan: Keep near door/teacher desk.",
+                "Restorative conversation post-event is critical."
+            ],
+            "Respect & Cooperation": [
+                "Avoid public confrontation; use corridor conversations.",
+                "Give 'take up time' after instructions.",
+                "Use 'Maybe... and...' language to de-escalate.",
+                "Check for underlying unmet needs (hunger, tiredness).",
+                "Positive phone call home for small wins."
+            ],
+            "Engagement & Focus": [
+                "Chunk tasks into 10-minute segments.",
+                "Use non-verbal cues to redirect (tap on desk).",
+                "Provide a fidget aid or movement break.",
+                "Seat away from high-distraction peers.",
+                "Use 'praise the prox' (praise students nearby)."
+            ],
+            "Organisation": [
+                "Visual timetable on desk.",
+                "Equipment check at door (provide quietly if missing).",
+                "Scaffold homework tasks clearly.",
+                "Regular locker/planner checks."
+            ],
+            "General Behaviour": [
+                "Consistency with school policy.",
+                "Build relationship through non-academic talk.",
+                "Reinforce positive routines."
+            ],
+            "SEN_ADD": [
+                "Pre-teach key vocabulary.",
+                "Use dual coding (visuals + text).",
+                "Check understanding: 'Tell me what you need to do'."
+            ]
+        };
+
+        // ================= HELPERS =================
+        const parseDate = (d) => {
+            if(!d) return null;
+            const dateStr = String(d).trim();
+            if (dateStr.includes('-') && dateStr.match(/^\d{1,2}-\d{1,2}-\d{4}/)) {
+                const parts = dateStr.split('-');
+                return new Date(parts[2], parts[1] - 1, parts[0]);
+            }
+            if (dateStr.includes('/')) {
+                const parts = dateStr.split(/[\/\sT]/); 
+                if (parts.length >= 3) {
+                    const day = parseInt(parts[0], 10);
+                    const month = parseInt(parts[1], 10);
+                    const year = parseInt(parts[2], 10);
+                    if (!isNaN(month) && !isNaN(day) && year > 1000) {
+                        return new Date(year, month - 1, day);
+                    }
+                }
+                return new Date(dateStr);
+            }
+            if(!isNaN(d) && d > 40000 && d < 50000) return new Date((d - (25567 + 1))*86400*1000);
+            const dt = new Date(d);
+            return isNaN(dt) ? new Date() : dt;
+        };
+
+        // NEW: Period Calculator
+        const getPeriodFromTime = (timeStr) => {
+            if (!timeStr) return 0; // Unknown
+            
+            // Handle formats like "10:01", "14:25:00", etc.
+            const parts = timeStr.split(':');
+            if (parts.length < 2) return 0;
+            
+            const hour = parseInt(parts[0], 10);
+            const minute = parseInt(parts[1], 10);
+            const timeVal = hour + (minute / 60);
+
+            // Heuristic for School Periods
+            if (timeVal < 9.75) return 1; // Before 9:45 -> P1
+            if (timeVal < 10.75) return 2; // Before 10:45 -> P2
+            if (timeVal < 12.0) return 3;  // Before 12:00 -> P3
+            if (timeVal < 13.0) return 4;  // Before 13:00 -> P4
+            if (timeVal < 14.5) return 5;  // Before 14:30 -> P5
+            return 6;                      // After 14:30 -> P6
+        };
+
+        const diagnose = (str) => {
+            if(!str) return "General";
+            const s = str.toLowerCase();
+            if(DIAGNOSIS_MAP.safety.some(k => s.includes(k))) return "Safety & Regulation";
+            if(DIAGNOSIS_MAP.defiance.some(k => s.includes(k))) return "Respect & Cooperation";
+            if(DIAGNOSIS_MAP.disruption.some(k => s.includes(k))) return "Engagement & Focus";
+            if(DIAGNOSIS_MAP.organisation.some(k => s.includes(k))) return "Organisation";
+            return "General Behaviour";
+        };
+        
+        const getDiagClass = (d) => {
+            if(d.includes("Safety")) return "diag-saf";
+            if(d.includes("Respect")) return "diag-def";
+            if(d.includes("Engagement")) return "diag-dis";
+            if(d.includes("Organisation")) return "diag-org";
+            return "diag-gen";
+        };
+
+        const getHeatmapColor = (count) => {
+            if (!count || count === 0) return 'bg-slate-50 text-slate-300';
+            if (count < 3) return 'bg-red-50 text-red-800';
+            if (count < 6) return 'bg-red-200 text-red-900';
+            if (count < 10) return 'bg-red-400 text-white';
+            if (count < 15) return 'bg-red-600 text-white';
+            return 'bg-red-900 text-white';
+        };
+
+        // ================= DATA PROCESSING =================
+        document.getElementById('file-input').addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if(!file) return;
+            document.getElementById('status-msg').innerHTML = `<span class="animate-pulse text-emerald-600">Processing ${file.name}...</span>`;
+            Papa.parse(file, { header: true, skipEmptyLines: true, complete: (res) => processData(res.data) });
+        });
+        
+        function loadDemoData() {
+            document.getElementById('status-msg').innerHTML = `<span class="animate-pulse text-emerald-600">Generating Demo Data...</span>`;
+            
+            const names = ["James Smith", "Sarah Jones", "Abdus Samad Sarwar", "Adam Ammar Khodja", "Mohammed Ali", "Chen Wei", "Jessica Taylor", "Thomas Brown", "Olivia Wilson"];
+            const types = ["Disruptive Behaviour", "Defiance", "No Homework", "Late", "On Call - Refusal", "Physical Aggression", "Truancy", "Equipment Missing", "General (Form Time Detention)"];
+            const subjects = ["Maths", "English", "Science", "Geography", "History", "PE", "Art", "Drama"];
+            const forms = ["7A", "7B", "8A", "9C", "10D", "11A"];
+            const demoData = [];
+            const today = new Date();
+            
+            for(let i=0; i<250; i++) {
+                const n = names[Math.floor(Math.random() * names.length)];
+                const t = types[Math.floor(Math.random() * types.length)];
+                const s = subjects[Math.floor(Math.random() * subjects.length)];
+                const y = forms.find(f => f.includes("7") || f.includes("8") || f.includes("9") || f.includes("10") || f.includes("11")).replace(/\D/g,'');
+                const daysAgo = Math.floor(Math.random() * 30);
+                const d = new Date(today);
+                d.setDate(d.getDate() - daysAgo);
+                const dd = String(d.getDate()).padStart(2, '0');
+                const mm = String(d.getMonth() + 1).padStart(2, '0');
+                const yyyy = d.getFullYear();
+                const dateStr = `${dd}-${mm}-${yyyy}`;
+                
+                // Generate Random Time for Period calc
+                const hour = 9 + Math.floor(Math.random() * 6); // 9 to 15
+                const min = Math.floor(Math.random() * 60);
+                const timeStr = `${String(hour).padStart(2,'0')}:${String(min).padStart(2,'0')}`;
+
+                let isSen = (n === "Abdus Samad Sarwar" || n === "Adam Ammar Khodja") ? "K" : (Math.random() > 0.8 ? "K" : "N");
+
+                demoData.push({
+                    "firstName": n.split(" ")[0], 
+                    "lastName": n.split(" ").slice(1).join(" "),
+                    "studentYearGroup": Math.floor(Math.random() * 5) + 7,
+                    "tutorGroupName": forms[Math.floor(Math.random() * forms.length)],
+                    "eventType": t, "subject": s, 
+                    "whenDate": dateStr, "whenTime": timeStr,
+                    "SEN status": isSen,
+                    "Pupil Premium Indicator": Math.random() > 0.7 ? "TRUE" : "FALSE",
+                    "schoolNotes": `Student was ${t.toLowerCase()} in lesson. refused to follow instructions.`,
+                    "groupName": `${y}${s.substring(0,2)}1` // Fake class code
+                });
+            }
+            processData(demoData);
+        }
+
+        function processData(rows) {
+            studentData = {};
+            onCallStats = { groups:{}, students:{}, subjects:{}, teachers:{} };
+            
+            // Init Heatmap for Periods 1-6
+            heatmapData = {};
+            heatmapDrilldown = {};
+            [1,2,3,4,5,6].forEach(p => { 
+                heatmapData[p] = {1:0, 2:0, 3:0, 4:0, 5:0}; 
+                heatmapDrilldown[p] = { 
+                    1: {}, 2: {}, 3: {}, 4: {}, 5: {} 
+                };
+            });
+
+            const get = (row, keys) => {
+                if (!keys) return "";
+                if (Array.isArray(keys)) {
+                    for(let k of keys) {
+                        if (row[k] !== undefined) return row[k];
+                        const found = Object.keys(row).find(rk => rk.toLowerCase() === k.toLowerCase());
+                        if(found) return row[found];
+                    }
+                    return "";
+                }
+                return row[keys] || "";
+            };
+
+            const isIgnored = (row) => {
+                let type = get(row, ["eventType", "reason", "eventCode"]) || "Other";
+                let code = get(row, ["eventCode", "code"]) || "";
+                if (type.toLowerCase() === 'general' || code.toLowerCase() === 'gen' || type.toLowerCase().includes('(form time detention)') || code.toLowerCase().includes('ftd')) {
+                    return true; 
+                }
+                return false;
+            };
+
+            let totalEvents = 0;
+            let allValidDates = new Set();
+
+            rows.forEach(row => {
+                if (isIgnored(row)) return; 
+                let dStr = get(row, ["whenDate", "date", "createdDate", "incidentDate"]); 
+                let d = parseDate(dStr);
+                if(d) {
+                    d.setHours(0,0,0,0);
+                    allValidDates.add(d.getTime());
+                }
+            });
+            
+            recentActiveDates = Array.from(allValidDates).sort((a,b) => b - a).slice(0, 5);
+            const recentActiveDatesSet = new Set(recentActiveDates);
+
+            document.getElementById('heatmap-date-range').innerText = `Data from 5 Most Recent Days`;
+
+            rows.forEach(row => {
+                let fname = get(row, ["firstName", "forename"]);
+                let lname = get(row, ["lastName", "surname"]);
+                let name = (fname && lname) ? `${fname} ${lname}` : get(row, ["student name", "name"]);
+                
+                if(!name || name.length < 2) return;
+
+                let year = (get(row, ["studentYearGroup", "year"]) || "Unknown").toString().replace(/Year\s*/i, '').trim();
+                let reg = get(row, ["tutorGroupName", "form", "reg"]) || "N/A";
+                let type = get(row, ["eventType", "reason", "eventCode"]) || "Other";
+                let subj = get(row, ["subject"]) || "General"; 
+                let comments = get(row, ["schoolNotes", "comments"]) || "";
+                let teacher = get(row, ["staffMembersInvolved", "teacher", "createdBy"]) || "Unknown";
+                let grp = get(row, ["groupName", "group", "class"]) || "Unknown"; // Class code
+
+                if (isIgnored(row)) return;
+
+                let dStr = get(row, ["whenDate", "date", "createdDate"]);
+                let d = parseDate(dStr);
+                if(!d) d = new Date();
+
+                // Heatmap & Drilldown Logic
+                if (recentActiveDatesSet.has(d.setHours(0,0,0,0))) {
+                     const day = new Date(d).getDay(); 
+                     
+                     // Get Period
+                     let timeStr = get(row, ["whenTime", "time"]);
+                     if (!timeStr) {
+                         // Try extract from createdDate if available e.g. "13/Nov/2025 10:01"
+                         const cd = get(row, ["createdDate"]);
+                         if (cd && cd.match(/\d{1,2}:\d{2}/)) timeStr = cd.match(/\d{1,2}:\d{2}/)[0];
+                     }
+                     const period = getPeriodFromTime(timeStr);
+
+                     if (day >= 1 && day <= 5 && period >= 1 && period <= 6) {
+                         heatmapData[period][day]++;
+                         
+                         // Drilldown: Store stats per year per class
+                         if (!heatmapDrilldown[period][day][year]) heatmapDrilldown[period][day][year] = {};
+                         if (!heatmapDrilldown[period][day][year][grp]) heatmapDrilldown[period][day][year][grp] = 0;
+                         heatmapDrilldown[period][day][year][grp]++;
+                     }
+                }
+
+                let sen = get(row, ["SEN status", "sen"]);
+                let isSEN = (sen && !sen.toLowerCase().includes("no special") && sen !== "N");
+                let pp = get(row, ["Pupil Premium Indicator", "pupil premium", "Disadvantaged"]);
+                let isPP = (pp && (String(pp).toUpperCase() === "TRUE" || pp === "1" || String(pp).toUpperCase() === "YES"));
+                let ra = get(row, ["Reading age", "reading age"]);
+                let pa = get(row, ["Prior Attainment (KS2)", "Prior Attainment"]);
+
+                if(!studentData[name]) {
+                    studentData[name] = { 
+                        name, year, reg, count:0, 
+                        isSEN, senStatus: sen || "N", isPP, 
+                        ra: ra || "--", pa: pa || "--",
+                        types:{}, subjects:{}, incidents:[], notes:[] 
+                    };
+                }
+                studentData[name].count++;
+                studentData[name].types[type] = (studentData[name].types[type]||0)+1;
+                studentData[name].subjects[subj] = (studentData[name].subjects[subj]||0)+1;
+                studentData[name].incidents.push({ date: new Date(d), type: type });
+                if(comments) studentData[name].notes.push(comments);
+
+                if (type.toLowerCase().includes('on call') || type.toLowerCase().includes('remove') || type.toLowerCase().includes('red card') || type.toLowerCase().includes('detention')) {
+                    onCallStats.students[name] = (onCallStats.students[name] || 0) + 1;
+                    onCallStats.subjects[subj] = (onCallStats.subjects[subj] || 0) + 1;
+                    const tKey = `${teacher} (${reg})`;
+                    onCallStats.teachers[tKey] = (onCallStats.teachers[tKey] || 0) + 1;
+                }
+
+                totalEvents++;
+            });
+
+            document.getElementById('total-incidents').innerText = totalEvents;
+            document.getElementById('status-msg').innerText = "Analysis Complete";
+            
+            renderMatrices();
+            renderHeatmap();
+            renderOnCallStats();
+        }
+
+        function renderMatrices() {
+            const container = document.getElementById('year-matrices');
+            container.innerHTML = "";
+            ["7","8","9","10","11"].forEach(y => {
+                const students = Object.values(studentData).filter(s => s.year === y).sort((a,b)=>b.count-a.count).slice(0,5);
+                const card = document.createElement('div');
+                card.className = "bg-white rounded-xl shadow-sm border border-emerald-100 overflow-hidden flex flex-col";
+                let html = `
+                    <div class="bg-emerald-50 p-3 border-b border-emerald-100 font-bold text-emerald-800 flex justify-between items-center">
+                        <span>Year ${y}</span> 
+                        <button onclick="openModal('${y}')" class="text-[10px] bg-white border border-emerald-200 hover:bg-emerald-100 px-2 py-1 rounded uppercase transition">View All</button>
+                    </div>
+                    <div class="divide-y divide-slate-50 flex-1">
+                `;
+                if(students.length===0) html += `<div class="p-4 text-xs text-slate-400 text-center italic">No Data</div>`;
+                students.forEach(s => {
+                    html += `
+                        <div onclick="loadProfile('${s.name.replace(/'/g, "\\'")}')" class="p-3 hover:bg-yellow-50 cursor-pointer flex justify-between items-center transition group">
+                            <div class="truncate pr-2">
+                                <div class="text-sm font-bold text-slate-700 group-hover:text-emerald-800 truncate">${s.name}</div>
+                                <div class="flex gap-1 mt-1">
+                                    ${s.isSEN ? '<span class="tag tag-sen">SEN</span>' : ''}
+                                    ${s.isPP ? '<span class="tag tag-pp">PP</span>' : ''}
+                                </div>
+                            </div>
+                            <div class="font-bold text-red-600 bg-red-50 px-2 py-1 rounded text-xs">${s.count}</div>
+                        </div>`;
+                });
+                html += `</div>`;
+                card.innerHTML = html;
+                container.appendChild(card);
+            });
+        }
+
+        function renderOnCallStats() {
+            document.getElementById('on-call-analysis').classList.remove('hidden');
+            const renderList = (data, elemId) => {
+                const el = document.getElementById(elemId);
+                const sorted = Object.entries(data).sort((a,b) => b[1]-a[1]).slice(0,5);
+                if (sorted.length === 0) { el.innerHTML = `<div class="text-xs text-slate-400 italic">No specific data found.</div>`; return; }
+                el.innerHTML = sorted.map(([k, v], i) => `
+                    <div class="flex justify-between items-center text-xs border-b border-slate-50 py-1.5 last:border-0">
+                        <div class="truncate pr-2 w-3/4 text-slate-600"><span class="font-bold text-emerald-200 mr-2">${i+1}</span> ${k}</div>
+                        <div class="font-bold text-red-600 bg-red-50 px-2 py-0.5 rounded">${v}</div>
+                    </div>`).join('');
+            };
+            renderList(onCallStats.students, 'oc-students');
+            renderList(onCallStats.subjects, 'oc-subjects');
+            renderList(onCallStats.teachers, 'oc-teachers');
+        }
+
+        function renderHeatmap() {
+            document.getElementById('heatmap-section').classList.remove('hidden');
+            const container = document.getElementById('heatmap-grid');
+            container.innerHTML = "";
+            
+            // Rows are now PERIODS 1-6
+            [1, 2, 3, 4, 5, 6].forEach(p => {
+                const rowData = heatmapData[p];
+                if(!rowData) return;
+                
+                const rowHTML = `
+                    <div class="grid grid-cols-6 gap-2">
+                        <div class="flex items-center pl-2 font-bold text-slate-700 text-sm">P${p}</div>
+                        <div onclick="showPeriodDetail(${p}, 1)" class="hm-cell h-8 rounded flex items-center justify-center text-xs font-bold ${getHeatmapColor(rowData[1])}">${rowData[1] || '-'}</div>
+                        <div onclick="showPeriodDetail(${p}, 2)" class="hm-cell h-8 rounded flex items-center justify-center text-xs font-bold ${getHeatmapColor(rowData[2])}">${rowData[2] || '-'}</div>
+                        <div onclick="showPeriodDetail(${p}, 3)" class="hm-cell h-8 rounded flex items-center justify-center text-xs font-bold ${getHeatmapColor(rowData[3])}">${rowData[3] || '-'}</div>
+                        <div onclick="showPeriodDetail(${p}, 4)" class="hm-cell h-8 rounded flex items-center justify-center text-xs font-bold ${getHeatmapColor(rowData[4])}">${rowData[4] || '-'}</div>
+                        <div onclick="showPeriodDetail(${p}, 5)" class="hm-cell h-8 rounded flex items-center justify-center text-xs font-bold ${getHeatmapColor(rowData[5])}">${rowData[5] || '-'}</div>
+                    </div>
+                `;
+                container.innerHTML += rowHTML;
+            });
+        }
+
+        // NEW: Show details for a specific cell (Period x Day)
+        function showPeriodDetail(period, day) {
+            const dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+            const modal = document.getElementById('detail-modal');
+            document.getElementById('modal-title').innerText = `${dayNames[day]} - Period ${period}`;
+            document.getElementById('modal-subtitle').innerText = "Breakdown of class codes with the highest incident counts by Year Group.";
+
+            const container = document.getElementById('modal-content-container');
+            container.innerHTML = `
+                <div class="bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden">
+                    <table class="min-w-full text-sm">
+                        <thead class="bg-emerald-50 border-b border-emerald-100 text-emerald-800 uppercase text-xs font-bold">
+                            <tr>
+                                <th class="px-6 py-3 text-left">Year Group</th>
+                                <th class="px-6 py-3 text-left">Problem Class (Code)</th>
+                                <th class="px-6 py-3 text-center">Incident Count</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-100">
+                            ${generatePeriodRows(period, day)}
+                        </tbody>
+                    </table>
+                </div>
+            `;
+            
+            modal.classList.remove('hidden');
+        }
+
+        function generatePeriodRows(period, day) {
+            const data = heatmapDrilldown[period][day];
+            if (!data || Object.keys(data).length === 0) {
+                return `<tr><td colspan="3" class="px-6 py-4 text-center text-slate-400 italic">No incidents recorded for this slot.</td></tr>`;
+            }
+
+            const sortedYears = Object.keys(data).sort((a,b) => a-b); // Year 7, 8, 9...
+            
+            return sortedYears.map(year => {
+                const classes = data[year];
+                // Find class with max incidents
+                const topClass = Object.entries(classes).sort((a,b) => b[1]-a[1])[0];
+                
+                if (!topClass) return '';
+
+                return `
+                    <tr class="hover:bg-slate-50">
+                        <td class="px-6 py-3 font-bold text-slate-700">Year ${year}</td>
+                        <td class="px-6 py-3 font-mono text-red-600 font-bold">${topClass[0]}</td>
+                        <td class="px-6 py-3 text-center text-slate-600">${topClass[1]}</td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        function loadProfile(name) {
+            const s = studentData[name];
+            if(!s) return;
+
+            document.getElementById('student-focus').classList.remove('hidden');
+            document.getElementById('student-focus').scrollIntoView({ behavior: 'smooth' });
+            document.getElementById('focus-name').innerText = s.name;
+            document.getElementById('focus-reg').innerText = s.reg;
+            document.getElementById('focus-count').innerText = s.count;
+            document.getElementById('focus-ra').innerText = s.ra;
+            document.getElementById('focus-pa').innerText = s.pa;
+            document.getElementById('focus-sen-detail').innerText = s.senStatus;
+            document.getElementById('focus-pp-detail').innerText = s.isPP ? "Yes" : "No";
+
+            const badgeContainer = document.getElementById('focus-badges');
+            badgeContainer.innerHTML = "";
+            if(s.isSEN) badgeContainer.innerHTML += `<span class="tag tag-sen">SEN</span>`;
+            if(s.isPP) badgeContainer.innerHTML += `<span class="tag tag-pp">Pupil Premium</span>`;
+            
+            const sortedIssues = Object.entries(s.types).sort((a,b)=>b[1]-a[1]);
+            let topIssue = sortedIssues[0]?.[0] || "General";
+            let diag = diagnose(topIssue);
+
+            if (diag === "General Behaviour" && sortedIssues.length > 1) {
+                const secondIssue = sortedIssues[1][0];
+                const secondDiag = diagnose(secondIssue);
+                if (secondDiag !== "General Behaviour") {
+                    topIssue = secondIssue;
+                    diag = secondDiag;
+                }
+            }
+
+            const diagEl = document.getElementById('focus-diagnosis');
+            diagEl.innerText = diag;
+            diagEl.className = `${getDiagClass(diag)} px-3 py-1 rounded text-xs font-bold uppercase`;
+
+            const ignoredSubjects = ["General", "Registration", "Tutor", "Form"];
+            const subjectEntries = Object.entries(s.subjects)
+                .filter(([k, v]) => !ignoredSubjects.includes(k))
+                .sort((a,b) => b[1]-a[1]);
+            
+            let subjDisplay = "N/A";
+            if (subjectEntries.length > 0) {
+                if (subjectEntries[0][1] > 10) {
+                    subjDisplay = subjectEntries.slice(0, 3).map(e => `${e[0]} (${e[1]})`).join(", ");
+                } else {
+                    subjDisplay = subjectEntries[0][0];
+                }
+            }
+            document.getElementById('focus-dept').innerText = subjDisplay;
+
+            // Check internal SEN Provision Database
+            const specificStrategies = SEN_PROVISIONS_DB[s.name] || [];
+            renderStrategies(diag, s.isSEN, specificStrategies);
+
+            const allNotes = s.notes.join(" ").toLowerCase();
+            const keywords = ["chat", "rude", "work", "refused", "late", "phone", "shout"];
+            const foundKeys = keywords.filter(k => allNotes.includes(k));
+            const analysisEl = document.getElementById('comment-analysis');
+            if(s.notes.length > 0) {
+                analysisEl.innerHTML = `<strong>Recent Logs:</strong> "${s.notes.slice(0,2).join('", "')}..."<br><br><strong>Recurring themes:</strong> ${foundKeys.length > 0 ? foundKeys.join(", ") : "General disruption"}`;
+            } else {
+                analysisEl.innerText = "No qualitative data logged.";
+            }
+            renderChart(s.incidents);
+        }
+
+        function renderStrategies(diagnosis, isSEN, specificStrategies) {
+            const classContainer = document.getElementById('strat-classroom');
+            const senContainer = document.getElementById('strat-special');
+            const senHeader = document.getElementById('sen-header');
+
+            // Classroom Strategies
+            let html = STRATEGIES[diagnosis].map(st => `
+                <div class="strat-card border-l-4 border-emerald-500">
+                    <span class="text-emerald-600 font-bold text-lg leading-none mr-2">&bull;</span>
+                    <span>${st}</span>
+                </div>
+            `).join('');
+            classContainer.innerHTML = html;
+
+            // SEN Strategies (Specific OR Generic)
+            let senHtml = "";
+            if (specificStrategies && specificStrategies.length > 0) {
+                // Use linked Provision Map Data
+                senHeader.innerText = "Strategies from SEN Passport"; 
+                senHeader.className = "text-xs font-bold text-blue-700 uppercase mb-3 border-b border-blue-100 pb-1";
+                
+                senHtml += specificStrategies.map(st => `
+                    <div class="strat-card border-l-4 border-blue-500 bg-blue-50">
+                        <span class="text-blue-600 font-bold text-lg leading-none mr-2">&#10003;</span>
+                        <span>${st}</span>
+                    </div>
+                `).join('');
+            } else if (isSEN) {
+                // Fallback to Generic SEN Strategies
+                senHeader.innerText = "General SEN Strategies";
+                senHeader.className = "text-xs font-bold text-purple-600 uppercase mb-3 border-b border-purple-100 pb-1";
+
+                senHtml += STRATEGIES["SEN_ADD"].map(st => `
+                    <div class="strat-card border-l-4 border-purple-500">
+                        <span class="text-purple-600 font-bold text-lg leading-none mr-2">+</span>
+                        <span>${st}</span>
+                    </div>
+                `).join('');
+            } else {
+                senHeader.innerText = "SEN & Literacy Support";
+                senHeader.className = "text-xs font-bold text-slate-400 uppercase mb-3 border-b border-slate-100 pb-1";
+                senHtml = `<div class="text-xs text-slate-400 italic p-2">No specific SEN strategies required based on current status.</div>`;
+            }
+            senContainer.innerHTML = senHtml;
+        }
+
+        function renderChart(incidents) {
+            const ctx = document.getElementById('student-chart').getContext('2d');
+            if(chartInstance) chartInstance.destroy();
+            const months = {};
+            incidents.forEach(i => {
+                const k = i.date.toLocaleString('default', { month: 'short' });
+                months[k] = (months[k]||0)+1;
+            });
+            chartInstance = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: Object.keys(months),
+                    datasets: [{
+                        label: 'Incidents',
+                        data: Object.values(months),
+                        backgroundColor: '#064e3b',
+                        borderRadius: 4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: { y: { beginAtZero: true, grid: { display: false } }, x: { grid: { display: false } } }
+                }
+            });
+        }
+
+        function closeProfile() {
+            document.getElementById('student-focus').classList.add('hidden');
+        }
+
+        // Original Modal Logic for Year Groups
+        function openModal(year) {
+            const modal = document.getElementById('detail-modal');
+            document.getElementById('modal-title').innerText = `Year ${year} Analysis`;
+            document.getElementById('modal-subtitle').innerText = "Calculated based on the 5 most recent active dates found in the upload.";
+            
+            const dateList = recentActiveDates.length > 0 ? recentActiveDates.map(d => new Date(d).toLocaleDateString()).join(', ') : "None";
+
+            const students = Object.values(studentData).filter(s => s.year === year);
+            const recentDatesSet = new Set(recentActiveDates);
+
+            const analysisData = students.map(s => {
+                const periodIncidents = s.incidents.filter(i => recentDatesSet.has(i.date.setHours(0,0,0,0)));
+                if (periodIncidents.length === 0) return null;
+
+                let onCallCount = 0;
+                let physCount = 0;
+                let typeCounts = {};
+
+                periodIncidents.forEach(i => {
+                    const t = i.type.toLowerCase();
+                    if(t.includes('on call') || t.includes('remove') || t.includes('red card') || t.includes('detention')) onCallCount++;
+                    if(t.includes('phys') || t.includes('fight') || t.includes('assault') || t.includes('strike') || t.includes('viol')) physCount++;
+                    typeCounts[i.type] = (typeCounts[i.type] || 0) + 1;
+                });
+
+                const topType = Object.entries(typeCounts).sort((a,b) => b[1]-a[1])[0]?.[0] || "General";
+
+                return {
+                    name: s.name,
+                    reg: s.reg,
+                    totalEvents: periodIncidents.length,
+                    onCallCount,
+                    physCount,
+                    primaryIssue: topType
+                };
+            }).filter(x => x !== null);
+
+            analysisData.sort((a,b) => b.totalEvents - a.totalEvents);
+
+            const container = document.getElementById('modal-content-container');
+            
+            let html = `
+             <div class="mb-4 text-xs text-slate-500 font-mono">Active Dates: ${dateList}</div>
+             <div class="bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden">
+                <table class="min-w-full text-sm">
+                    <thead class="bg-red-50 border-b border-red-100 text-red-900 uppercase text-xs font-bold">
+                        <tr>
+                            <th class="px-6 py-3 text-left">Student Name</th>
+                            <th class="px-6 py-3 text-left">Primary Issue</th>
+                            <th class="px-6 py-3 text-center">Total Events</th>
+                            <th class="px-6 py-3 text-center">On Call, count</th>
+                            <th class="px-6 py-3 text-center">Physical Altercation, count</th>
+                            <th class="px-6 py-3 text-center">Decision</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100">`;
+
+            if(analysisData.length === 0) {
+                html += `<tr><td colspan="6" class="px-6 py-4 text-center text-slate-400 italic">No data found.</td></tr>`;
+            } else {
+                analysisData.slice(0, 50).forEach((data, index) => {
+                    const isTop5 = index < 5;
+                    const decisionClass = isTop5 
+                        ? "bg-red-100 text-red-800 border border-red-200" 
+                        : "bg-green-100 text-green-800 border border-green-200";
+                    const decisionText = isTop5 ? "High Monitoring" : "Monitor";
+
+                    html += `
+                        <tr class="hover:bg-slate-50 border-b border-slate-100 cursor-pointer" onclick="closeModal(); loadProfile('${data.name.replace(/'/g, "\\'")}')">
+                            <td class="px-6 py-3 font-bold text-slate-700">${data.name}</td>
+                            <td class="px-6 py-3"><span class="text-[10px] uppercase font-bold bg-slate-100 text-slate-600 px-2 py-1 rounded">${data.primaryIssue}</span></td>
+                            <td class="px-6 py-3 text-center font-bold text-slate-800">${data.totalEvents}</td>
+                            <td class="px-6 py-3 text-center text-slate-600">${data.onCallCount}</td>
+                            <td class="px-6 py-3 text-center text-slate-600">${data.physCount}</td>
+                            <td class="px-6 py-3 text-center">
+                                <span class="text-[10px] font-bold uppercase px-3 py-1 rounded-full ${decisionClass}">${decisionText}</span>
+                            </td>
+                        </tr>
+                    `;
+                });
+            }
+            html += `</tbody></table></div>`;
+            container.innerHTML = html;
+
+            modal.classList.remove('hidden');
+        }
+
+        function closeModal() {
+            document.getElementById('detail-modal').classList.add('hidden');
+        }
+    </script>
+</body>
+</html>
